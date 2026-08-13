@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       { success: true, response: responseText },
-      { headers: CORS_HEADERS }
+      { headers: { ...CORS_HEADERS, "X-RateLimit-Remaining": String(remaining) } }
     );
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));
