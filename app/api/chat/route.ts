@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_PROMPT, KNOWLEDGE_BASE } from "@/lib/chatbot-constants";
+import { isOriginAllowed } from "@/lib/allowed-origins";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
@@ -7,11 +9,47 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+function getOrigin(req: NextRequest): string | null {
+  return req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || null;
+}
+
+function getClientIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: CORS_HEADERS });
 }
 
 export async function POST(req: NextRequest) {
+  const origin = getOrigin(req);
+  if (!isOriginAllowed(origin)) {
+    return NextResponse.json(
+      { error: "Origin not allowed" },
+      { status: 403, headers: CORS_HEADERS }
+    );
+  }
+
+  const ip = getClientIp(req);
+  const { allowed, remaining } = checkRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a minute." },
+      {
+        status: 429,
+        headers: {
+          ...CORS_HEADERS,
+          "Retry-After": "60",
+          "X-RateLimit-Remaining": "0",
+        },
+      }
+    );
+  }
+
   try {
     const { history } = await req.json();
 
@@ -47,10 +85,13 @@ export async function POST(req: NextRequest) {
       { headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal Server Error";
-    console.error("API Error:", error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    // Details bleiben im Container-Log. Nach aussen geht nur eine
+    // allgemeine Meldung: die OpenAI-Fehler enthalten sonst den
+    // teilmaskierten Schluessel und interne Hinweise.
+    console.error("API Error:", err);
     return NextResponse.json(
-      { error: message },
+      { error: "Der Assistent ist gerade nicht erreichbar." },
       { status: 500, headers: CORS_HEADERS }
     );
   }

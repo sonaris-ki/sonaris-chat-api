@@ -1,0 +1,27 @@
+services:
+  sonaris-chat-api:
+    build:
+      context: .
+    container_name: sonaris-chat-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+
+      # Der Website-Container beansprucht Host(`sonaris.de`) fuer alles.
+      # Dieser Router ist spezifischer und braucht darum eine hoehere
+      # Prioritaet, sonst greift weiter die statische Seite und /api/chat
+      # bleibt bei 404.
+      - traefik.http.routers.sonaris-chat-api.rule=(Host(`sonaris.de`) || Host(`www.sonaris.de`)) && PathPrefix(`/api`)
+      - traefik.http.routers.sonaris-chat-api.priority=100
+      - traefik.http.routers.sonaris-chat-api.entrypoints=websecure
+      - traefik.http.routers.sonaris-chat-api.tls.certresolver=letsencrypt
+      - traefik.http.services.sonaris-chat-api.loadbalancer.server.port=3001
+
+networks:
+  proxy:
+    external: true
