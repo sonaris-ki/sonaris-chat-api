@@ -8,3 +8,4 @@ node_modules
 lib/embedded-content.generated.ts
 
 .DS_Store
+tsconfig.tsbuildinfo
