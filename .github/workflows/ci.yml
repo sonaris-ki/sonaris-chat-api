@@ -29,6 +29,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # lib/embedded-content.generated.ts entsteht erst beim Bau aus
+      # content/*.md. Ohne diesen Schritt findet tsc das Modul nicht.
+      - run: node scripts/embed-content.cjs
       - run: npx tsc --noEmit
 
   build:

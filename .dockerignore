@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env*.local
+.DS_Store
+_brand
+content/system-prompt-v1-backup.md
